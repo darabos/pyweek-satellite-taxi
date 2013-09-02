@@ -1,10 +1,47 @@
+import ctypes
 import contextlib
 import math
+import os
 import pygame
 import sys
 from OpenGL.GL import *
 
 WIDTH, HEIGHT = 800, 600
+
+def Light(radius, height, strength):
+  r2 = float(radius * radius)
+  h2 = float(height * height)
+  data = ''
+  if os.path.exists('light.data'):
+    with file('light.data') as f:
+      data = f.read()
+  if len(data) != 3 * 1024 * 1024:
+    data = (ctypes.c_char * (3 * 1024 * 1024))()
+    i = 0
+    for x in range(1024):
+      x -= 512
+      for y in range(1024):
+        y -= 512
+        d2 = h2 + x * x + y * y
+        e2 = d2 - r2
+        alpha = math.atan(math.sqrt(r2 / e2)) * 2 / math.pi
+        c = chr(max(0, min(255, int(strength * 255 * alpha * alpha))))
+        data[i * 3] = c
+        data[i * 3 + 1] = c
+        data[i * 3 + 2] = c
+        i += 1
+    with file('light.data', 'wb') as f:
+      f.write(data)
+  tex = glGenTextures(1)
+  glBindTexture(GL_TEXTURE_2D, tex)
+  glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+  glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+  glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP)
+  glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
+  glTexParameter(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE)
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1024, 1024, 0, GL_RGB, GL_UNSIGNED_BYTE, data)
+  return tex
+
 
 def Circle(radius):
   glBegin(GL_TRIANGLE_FAN)
@@ -68,6 +105,7 @@ class Game(object):
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bg_tex, 0)
       glClear(GL_COLOR_BUFFER_BIT)
       Circle(100)
+    light = Light(20, 100, 50)
     clock = pygame.time.Clock()
     while True:
       clock.tick(40)
