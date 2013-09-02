@@ -1,3 +1,4 @@
+import contextlib
 import math
 import pygame
 import sys
@@ -24,6 +25,15 @@ def Quad(width, height):
   glTexCoord2d(1, 1)
   glVertex2d(0.5 * width, 0.5 * height)
   glEnd()
+
+
+@contextlib.contextmanager
+def Buffer(b):
+  glBindFramebuffer(GL_FRAMEBUFFER, b)
+  glViewport(0, 0, WIDTH * 2, HEIGHT * 2)
+  yield
+  glBindFramebuffer(GL_FRAMEBUFFER, 0)
+  glViewport(0, 0, WIDTH, HEIGHT)
 
 
 class Game(object):
@@ -54,13 +64,10 @@ class Game(object):
     glTexParameter(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH * 2, HEIGHT * 2, 0, GL_RGB, GL_UNSIGNED_BYTE, None)
     background = glGenFramebuffers(1)
-    glBindFramebuffer(GL_FRAMEBUFFER, background)
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bg_tex, 0)
-    glViewport(0, 0, WIDTH * 2, HEIGHT * 2)
-    glClear(GL_COLOR_BUFFER_BIT)
-    Circle(100)
-    glBindFramebuffer(GL_FRAMEBUFFER, 0)
-    glViewport(0, 0, WIDTH, HEIGHT)
+    with Buffer(background):
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bg_tex, 0)
+      glClear(GL_COLOR_BUFFER_BIT)
+      Circle(100)
     clock = pygame.time.Clock()
     while True:
       clock.tick(40)
@@ -70,9 +77,9 @@ class Game(object):
           sys.exit(0)
       pressed = pygame.key.get_pressed()
       if pressed[pygame.K_LEFT]:
-        self.vx -= 0.1
+        self.vx -= 10. / self.y
       if pressed[pygame.K_RIGHT]:
-        self.vx += 0.1
+        self.vx += 10. / self.y
       if pressed[pygame.K_DOWN]:
         self.vy -= 0.1
       if pressed[pygame.K_UP]:
