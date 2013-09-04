@@ -74,8 +74,8 @@ def Buffer(buf):
 
 
 def Collision(buf, phi, r, radius):
-  x = r * math.cos(phi)
-  y = r * math.sin(phi)
+  x = r * math.sin(phi * math.pi / 180)
+  y = r * math.cos(phi * math.pi / 180)
   glBindFramebuffer(GL_FRAMEBUFFER, buf)
   p = glReadPixels(x * 2 + WIDTH - radius, y * 2 + HEIGHT - radius, radius, radius, GL_RED, GL_UNSIGNED_BYTE)
   glBindFramebuffer(GL_FRAMEBUFFER, 0)
@@ -138,7 +138,16 @@ class Game(object):
       self.y += self.vy
       if Collision(background, self.x, self.y, 1):
         print 'crash!', clock.get_fps()
-        sys.exit(0)
+        with Buffer(background):
+          glLoadIdentity()
+          glRotatef(self.x, 0, 0, -1)
+          glTranslatef(0, self.y, 0)
+          glColor(0, 0, 0)
+          Circle(50)
+          glColor(255, 255, 255)
+        self.x = 0
+        self.y = 200
+        self.vx = self.vy = 0
       glClear(GL_COLOR_BUFFER_BIT)
       glLoadIdentity()
       glEnable(GL_TEXTURE_2D)
