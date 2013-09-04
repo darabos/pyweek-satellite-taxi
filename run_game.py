@@ -47,8 +47,9 @@ def Light(radius, height, strength):
 def Circle(radius):
   glBegin(GL_TRIANGLE_FAN)
   glVertex2d(0, 0)
-  for i in range(61):
-    glVertex2d(radius * math.cos(math.pi * i / 30), radius * math.sin(math.pi * i / 30))
+  segments = radius * 5
+  for i in range(segments + 1):
+    glVertex2d(radius * math.cos(math.pi * 2 * i / segments), radius * math.sin(math.pi * 2 * i / segments))
   glEnd()
 
 
@@ -115,9 +116,7 @@ def ReadPixels(buf, x, y, w, h):
   return p
 
 
-def Collision(buf, phi, r, radius):
-  x = r * math.sin(phi * math.pi / 180)
-  y = r * math.cos(phi * math.pi / 180)
+def Collision(buf, x, y, radius):
   p = ReadPixels(buf, x * 2 + WIDTH - radius, y * 2 + HEIGHT - radius, radius, radius)
   return any(c != '\0' for c in p)
 
@@ -125,48 +124,55 @@ def Collision(buf, phi, r, radius):
 class Taxi(object):
 
   def __init__(self):
-    self.x = 0
-    self.y = 200
-    self.vx = self.vy = 0
+    self.phi = 90
+    self.r = 200
+    self.vphi = self.vr = 0
     self.light = Light(20, 100, 50)
+    self.passenger = None
 
   def Update(self):
     pressed = pygame.key.get_pressed()
     if pressed[pygame.K_LEFT]:
-      self.vx -= 10. / self.y
+      self.vphi += 10. / self.r
     if pressed[pygame.K_RIGHT]:
-      self.vx += 10. / self.y
+      self.vphi -= 10. / self.r
     if pressed[pygame.K_DOWN]:
-      self.vy -= 0.1
+      self.vr -= 0.1
     if pressed[pygame.K_UP]:
-      self.vy += 0.1
-    self.vy -= 0.02
-    self.vx *= 0.99
-    self.vy *= 0.99
-    self.x += self.vx
-    self.y += self.vy
+      self.vr += 0.1
+    self.vr -= 0.02
+    self.vphi *= 0.99
+    self.vr *= 0.99
+    self.phi += self.vphi
+    self.r += self.vr
+    self.x = self.r * math.cos(self.phi * math.pi / 180)
+    self.y = self.r * math.sin(self.phi * math.pi / 180)
     if Collision(game.background, self.x, self.y, 1):
       with Buffer(game.background):
         glLoadIdentity()
-        glRotatef(self.x, 0, 0, -1)
-        glTranslatef(0, self.y, 0)
+        glTranslate(self.x, self.y, 0)
         with Color(0, 0, 0):
           Circle(50)
-      self.money -= 100
-      self.x = 0
-      self.y = 200
-      self.vx = self.vy = 0
+      self.phi = 90
+      self.r = 200
+      self.vphi = self.vr = 0
 
   def Render(self):
     with Transform():
-      glRotatef(self.x, 0, 0, -1)
-      glTranslatef(0, self.y, 0)
-      Quad(30, 8)
-      glTranslatef(0, 8, 0)
-      Quad(16, 8)
+      glRotate(self.phi, 0, 0, 1)
+      glTranslate(self.r, 0, 0)
       with Texture(self.light):
         with Blending():
-          Quad(1024, 1024)
+          with Color(0.2, 0.2, 0.2):
+            Quad(1024, 1024)
+      color = (1, 1, 1) if not self.passenger else (0.5, 1, 0.2)
+      with Color(*color):
+        Quad(8, 30)
+        glTranslate(8, 0, 0)
+        Quad(8, 16)
+
+  def AddPassenger(self, p):
+    self.passenger = p
 
 
 class Spawner(object):
@@ -190,7 +196,7 @@ class Spawner(object):
         fx = (r + 10) * math.cos(phi) + WIDTH / 2
         fy = (r + 10) * math.sin(phi) + HEIGHT / 2
         if Free(fx, fy):
-          self.guy = Guy(x - WIDTH / 2, y - HEIGHT / 2, phi * 180 / math.pi)
+          self.guy = Guy(float(x - WIDTH / 2), float(y - HEIGHT / 2), phi)
           game.objects.append(self.guy)
           break
 
@@ -203,23 +209,45 @@ class Guy(object):
   def __init__(self, x, y, phi):
     self.x = x
     self.y = y
-    self.phi = phi
-    self.p = 0
-    self.v = 0
+    self.tx = x + 10 * math.cos(phi)
+    self.ty = y + 10 * math.sin(phi)
+    self.phi = phi * 180 / math.pi
+    self.vx = 0
+    self.vy = 0
 
   def Update(self):
-    self.v += 0.01 * (100 - self.p)
-    self.v *= 0.9
-    self.p += self.v
+    dx = self.tx - self.x
+    dy = self.ty - self.y
+    self.vx += 0.01 * dx
+    self.vy += 0.01 * dy
+    self.vx *= 0.9
+    self.vy *= 0.9
+    self.x += self.vx
+    self.y += self.vy
+    dx = game.taxi.x - self.x
+    dy = game.taxi.y - self.y
+    d2 = dx * dx + dy * dy
+    if d2 < 1000:
+      d = math.sqrt(d2)
+      self.x += dx / d
+      self.y += dy / d
+      if d < 2:
+        game.objects.remove(self)
+        game.taxi.AddPassenger(self)
 
   def Render(self):
     with Transform():
       glTranslate(self.x, self.y, 0)
       glRotate(self.phi, 0, 0, 1)
-      glTranslate(0.1 * self.p, 0, 0)
-      glScale(0.01 * self.p, 0.01 * self.p, 1)
+      dx = self.tx - self.x
+      dy = self.ty - self.y
+      d2 = dx * dx + dy * dy
+      scale = 1.0 / (1.0 + 0.1 * d2)
+      glScale(scale, scale, 1)
       with Color(0.5, 1, 0.2):
-        Circle(10)
+        Quad(15, 10)
+        glTranslate(15, 0, 0)
+        Circle(5)
 
 
 class Game(object):
@@ -264,7 +292,7 @@ class Game(object):
           print 'fps:', clock.get_fps()
           pygame.quit()
           sys.exit(0)
-      for o in self.objects:
+      for o in self.objects[:]:
         o.Update()
       glClear(GL_COLOR_BUFFER_BIT)
       glLoadIdentity()
