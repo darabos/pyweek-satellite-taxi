@@ -3,6 +3,7 @@ import contextlib
 import math
 import os
 import pygame
+import random
 import sys
 from OpenGL.GL import *
 
@@ -64,6 +65,10 @@ def Quad(width, height):
   glEnd()
 
 
+def Length(x, y):
+  return math.sqrt(x * x + y * y)
+
+
 @contextlib.contextmanager
 def Buffer(buf):
   glBindFramebuffer(GL_FRAMEBUFFER, buf)
@@ -73,12 +78,47 @@ def Buffer(buf):
   glViewport(0, 0, WIDTH, HEIGHT)
 
 
+@contextlib.contextmanager
+def Texture(tex):
+  glEnable(GL_TEXTURE_2D)
+  glBindTexture(GL_TEXTURE_2D, tex)
+  yield
+  glDisable(GL_TEXTURE_2D)
+
+
+@contextlib.contextmanager
+def Blending():
+  glEnable(GL_BLEND)
+  glBlendFunc(GL_ONE, GL_ONE)
+  yield
+  glDisable(GL_BLEND)
+
+
+@contextlib.contextmanager
+def Transform():
+  glPushMatrix()
+  yield
+  glPopMatrix()
+
+
+@contextlib.contextmanager
+def Color(*rgba):
+  glColor(*rgba)
+  yield
+  glColor(1, 1, 1, 1)
+
+
+def ReadPixels(buf, x, y, w, h):
+  glBindFramebuffer(GL_FRAMEBUFFER, buf)
+  p = glReadPixels(x, y, w, h, GL_RED, GL_UNSIGNED_BYTE)
+  glBindFramebuffer(GL_FRAMEBUFFER, 0)
+  return p
+
+
 def Collision(buf, phi, r, radius):
   x = r * math.sin(phi * math.pi / 180)
   y = r * math.cos(phi * math.pi / 180)
-  glBindFramebuffer(GL_FRAMEBUFFER, buf)
-  p = glReadPixels(x * 2 + WIDTH - radius, y * 2 + HEIGHT - radius, radius, radius, GL_RED, GL_UNSIGNED_BYTE)
-  glBindFramebuffer(GL_FRAMEBUFFER, 0)
+  p = ReadPixels(buf, x * 2 + WIDTH - radius, y * 2 + HEIGHT - radius, radius, radius)
   return any(c != '\0' for c in p)
 
 
@@ -88,6 +128,7 @@ class Taxi(object):
     self.x = 0
     self.y = 200
     self.vx = self.vy = 0
+    self.light = Light(20, 100, 50)
 
   def Update(self):
     pressed = pygame.key.get_pressed()
@@ -109,19 +150,76 @@ class Taxi(object):
         glLoadIdentity()
         glRotatef(self.x, 0, 0, -1)
         glTranslatef(0, self.y, 0)
-        glColor(0, 0, 0)
-        Circle(50)
-        glColor(255, 255, 255)
+        with Color(0, 0, 0):
+          Circle(50)
+      self.money -= 100
       self.x = 0
       self.y = 200
       self.vx = self.vy = 0
 
   def Render(self):
-    glRotatef(self.x, 0, 0, -1)
-    glTranslatef(0, self.y, 0)
-    Quad(30, 8)
-    glTranslatef(0, 8, 0)
-    Quad(16, 8)
+    with Transform():
+      glRotatef(self.x, 0, 0, -1)
+      glTranslatef(0, self.y, 0)
+      Quad(30, 8)
+      glTranslatef(0, 8, 0)
+      Quad(16, 8)
+      with Texture(self.light):
+        with Blending():
+          Quad(1024, 1024)
+
+
+class Spawner(object):
+  def __init__(self):
+    self.guy = None
+
+  def Update(self):
+    if self.guy is None:
+      p = ReadPixels(game.background, 0, 0, WIDTH * 2, HEIGHT * 2)
+      def Free(x, y):
+        return p[int(x) * 2 + int(y) * 4 * WIDTH] == '\0'
+      full = []
+      for x in range(0, WIDTH, 10):
+        for y in range(0, HEIGHT, 10):
+          if not Free(x, y):
+            full.append((x, y))
+      random.shuffle(full)
+      for x, y in full:
+        phi = math.atan2(y - HEIGHT / 2, x - WIDTH / 2)
+        r = Length(y - HEIGHT / 2, x - WIDTH / 2)
+        fx = (r + 10) * math.cos(phi) + WIDTH / 2
+        fy = (r + 10) * math.sin(phi) + HEIGHT / 2
+        if Free(fx, fy):
+          self.guy = Guy(x - WIDTH / 2, y - HEIGHT / 2, phi * 180 / math.pi)
+          game.objects.append(self.guy)
+          break
+
+  def Render(self):
+    pass
+
+
+class Guy(object):
+
+  def __init__(self, x, y, phi):
+    self.x = x
+    self.y = y
+    self.phi = phi
+    self.p = 0
+    self.v = 0
+
+  def Update(self):
+    self.v += 0.01 * (100 - self.p)
+    self.v *= 0.9
+    self.p += self.v
+
+  def Render(self):
+    with Transform():
+      glTranslate(self.x, self.y, 0)
+      glRotate(self.phi, 0, 0, 1)
+      glTranslate(0.1 * self.p, 0, 0)
+      glScale(0.01 * self.p, 0.01 * self.p, 1)
+      with Color(0.5, 1, 0.2):
+        Circle(10)
 
 
 class Game(object):
@@ -156,23 +254,22 @@ class Game(object):
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bg_tex, 0)
       glClear(GL_COLOR_BUFFER_BIT)
       Circle(100)
-    light = Light(20, 100, 50)
     clock = pygame.time.Clock()
-    self.objects = [Taxi()]
+    self.taxi = Taxi()
+    self.objects = [self.taxi, Spawner()]
     while True:
       clock.tick(60)
       for e in pygame.event.get():
         if e.type == pygame.QUIT or e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
+          print 'fps:', clock.get_fps()
           pygame.quit()
           sys.exit(0)
       for o in self.objects:
         o.Update()
       glClear(GL_COLOR_BUFFER_BIT)
       glLoadIdentity()
-      glEnable(GL_TEXTURE_2D)
-      glBindTexture(GL_TEXTURE_2D, bg_tex)
-      Quad(WIDTH, HEIGHT)
-      glDisable(GL_TEXTURE_2D)
+      with Texture(bg_tex):
+        Quad(WIDTH, HEIGHT)
       for o in self.objects:
         o.Render()
       pygame.display.flip()
