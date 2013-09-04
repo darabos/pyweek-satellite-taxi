@@ -82,6 +82,48 @@ def Collision(buf, phi, r, radius):
   return any(c != '\0' for c in p)
 
 
+class Taxi(object):
+
+  def __init__(self):
+    self.x = 0
+    self.y = 200
+    self.vx = self.vy = 0
+
+  def Update(self):
+    pressed = pygame.key.get_pressed()
+    if pressed[pygame.K_LEFT]:
+      self.vx -= 10. / self.y
+    if pressed[pygame.K_RIGHT]:
+      self.vx += 10. / self.y
+    if pressed[pygame.K_DOWN]:
+      self.vy -= 0.1
+    if pressed[pygame.K_UP]:
+      self.vy += 0.1
+    self.vy -= 0.02
+    self.vx *= 0.99
+    self.vy *= 0.99
+    self.x += self.vx
+    self.y += self.vy
+    if Collision(game.background, self.x, self.y, 1):
+      with Buffer(game.background):
+        glLoadIdentity()
+        glRotatef(self.x, 0, 0, -1)
+        glTranslatef(0, self.y, 0)
+        glColor(0, 0, 0)
+        Circle(50)
+        glColor(255, 255, 255)
+      self.x = 0
+      self.y = 200
+      self.vx = self.vy = 0
+
+  def Render(self):
+    glRotatef(self.x, 0, 0, -1)
+    glTranslatef(0, self.y, 0)
+    Quad(30, 8)
+    glTranslatef(0, 8, 0)
+    Quad(16, 8)
+
+
 class Game(object):
 
   def __init__(self):
@@ -109,57 +151,32 @@ class Game(object):
     glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
     glTexParameter(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH * 2, HEIGHT * 2, 0, GL_RGB, GL_UNSIGNED_BYTE, None)
-    background = glGenFramebuffers(1)
-    with Buffer(background):
+    self.background = glGenFramebuffers(1)
+    with Buffer(self.background):
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bg_tex, 0)
       glClear(GL_COLOR_BUFFER_BIT)
       Circle(100)
     light = Light(20, 100, 50)
     clock = pygame.time.Clock()
+    self.objects = [Taxi()]
     while True:
       clock.tick(60)
       for e in pygame.event.get():
         if e.type == pygame.QUIT or e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
           pygame.quit()
           sys.exit(0)
-      pressed = pygame.key.get_pressed()
-      if pressed[pygame.K_LEFT]:
-        self.vx -= 10. / self.y
-      if pressed[pygame.K_RIGHT]:
-        self.vx += 10. / self.y
-      if pressed[pygame.K_DOWN]:
-        self.vy -= 0.1
-      if pressed[pygame.K_UP]:
-        self.vy += 0.1
-      self.vy -= 0.02
-      self.vx *= 0.99
-      self.vy *= 0.99
-      self.x += self.vx
-      self.y += self.vy
-      if Collision(background, self.x, self.y, 1):
-        print 'crash!', clock.get_fps()
-        with Buffer(background):
-          glLoadIdentity()
-          glRotatef(self.x, 0, 0, -1)
-          glTranslatef(0, self.y, 0)
-          glColor(0, 0, 0)
-          Circle(50)
-          glColor(255, 255, 255)
-        self.x = 0
-        self.y = 200
-        self.vx = self.vy = 0
+      for o in self.objects:
+        o.Update()
       glClear(GL_COLOR_BUFFER_BIT)
       glLoadIdentity()
       glEnable(GL_TEXTURE_2D)
       glBindTexture(GL_TEXTURE_2D, bg_tex)
       Quad(WIDTH, HEIGHT)
       glDisable(GL_TEXTURE_2D)
-      glRotatef(self.x, 0, 0, -1)
-      glTranslatef(0, self.y, 0)
-      Quad(30, 8)
-      glTranslatef(0, 8, 0)
-      Quad(16, 8)
+      for o in self.objects:
+        o.Render()
       pygame.display.flip()
 
 if __name__ == '__main__':
-  Game().Loop()
+  game = Game()
+  game.Loop()
