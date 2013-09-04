@@ -147,7 +147,7 @@ class Taxi(object):
     self.r += self.vr
     self.x = self.r * math.cos(self.phi * math.pi / 180)
     self.y = self.r * math.sin(self.phi * math.pi / 180)
-    if Collision(game.background, self.x, self.y, 1):
+    if Collision(game.background, self.x, self.y, 5):
       with Buffer(game.background):
         glLoadIdentity()
         glTranslate(self.x, self.y, 0)
@@ -156,6 +156,10 @@ class Taxi(object):
       self.phi = 90
       self.r = 200
       self.vphi = self.vr = 0
+      if self.passenger:
+        self.passenger = None
+        game.objects = [o for o in game.objects if not isinstance(o, Destination)]
+        game.Place(Guy)
 
   def Render(self):
     with Transform():
@@ -170,38 +174,6 @@ class Taxi(object):
         Quad(8, 30)
         glTranslate(8, 0, 0)
         Quad(8, 16)
-
-  def AddPassenger(self, p):
-    self.passenger = p
-
-
-class Spawner(object):
-  def __init__(self):
-    self.guy = None
-
-  def Update(self):
-    if self.guy is None:
-      p = ReadPixels(game.background, 0, 0, WIDTH * 2, HEIGHT * 2)
-      def Free(x, y):
-        return p[int(x) * 2 + int(y) * 4 * WIDTH] == '\0'
-      full = []
-      for x in range(0, WIDTH, 10):
-        for y in range(0, HEIGHT, 10):
-          if not Free(x, y):
-            full.append((x, y))
-      random.shuffle(full)
-      for x, y in full:
-        phi = math.atan2(y - HEIGHT / 2, x - WIDTH / 2)
-        r = Length(y - HEIGHT / 2, x - WIDTH / 2)
-        fx = (r + 10) * math.cos(phi) + WIDTH / 2
-        fy = (r + 10) * math.sin(phi) + HEIGHT / 2
-        if Free(fx, fy):
-          self.guy = Guy(float(x - WIDTH / 2), float(y - HEIGHT / 2), phi)
-          game.objects.append(self.guy)
-          break
-
-  def Render(self):
-    pass
 
 
 class Guy(object):
@@ -224,16 +196,18 @@ class Guy(object):
     self.vy *= 0.9
     self.x += self.vx
     self.y += self.vy
-    dx = game.taxi.x - self.x
-    dy = game.taxi.y - self.y
-    d2 = dx * dx + dy * dy
-    if d2 < 1000:
-      d = math.sqrt(d2)
-      self.x += dx / d
-      self.y += dy / d
-      if d < 2:
-        game.objects.remove(self)
-        game.taxi.AddPassenger(self)
+    if not game.taxi.passenger:
+      dx = game.taxi.x - self.x
+      dy = game.taxi.y - self.y
+      d2 = dx * dx + dy * dy
+      if d2 < 1000:
+        d = math.sqrt(d2)
+        self.x += dx / d
+        self.y += dy / d
+        if d < 5:
+          game.objects.remove(self)
+          game.taxi.passenger = self
+          game.Place(Destination)
 
   def Render(self):
     with Transform():
@@ -248,6 +222,53 @@ class Guy(object):
         Quad(15, 10)
         glTranslate(15, 0, 0)
         Circle(5)
+
+
+class Destination(object):
+
+  def __init__(self, x, y, phi):
+    self.x = x
+    self.y = y
+    self.tx = x + 20 * math.cos(phi)
+    self.ty = y + 20 * math.sin(phi)
+    self.phi = phi * 180 / math.pi
+    self.vx = 0
+    self.vy = 0
+
+  def Update(self):
+    dx = self.tx - self.x
+    dy = self.ty - self.y
+    self.vx += 0.01 * dx
+    self.vy += 0.01 * dy
+    self.vx *= 0.9
+    self.vy *= 0.9
+    self.x += self.vx
+    self.y += self.vy
+    if game.taxi.passenger:
+      dx = game.taxi.x - self.x
+      dy = game.taxi.y - self.y
+      d2 = dx * dx + dy * dy
+      if d2 < 1000:
+        d = math.sqrt(d2)
+        self.x += dx / d
+        self.y += dy / d
+        if d < 5:
+          game.objects.remove(self)
+          game.taxi.passenger = None
+          game.Place(Guy)
+
+  def Render(self):
+    with Transform():
+      glTranslate(self.x, self.y, 0)
+      glRotate(self.phi, 0, 0, 1)
+      dx = self.tx - self.x
+      dy = self.ty - self.y
+      d2 = dx * dx + dy * dy
+      scale = 1.0 / (1.0 + 0.1 * d2)
+      glScale(scale, scale, 1)
+      with Color(1, 0.7, 0.2):
+        glRotate(45, 0, 0, 1)
+        Quad(10, 10)
 
 
 class Game(object):
@@ -284,7 +305,8 @@ class Game(object):
       Circle(100)
     clock = pygame.time.Clock()
     self.taxi = Taxi()
-    self.objects = [self.taxi, Spawner()]
+    self.objects = [self.taxi]
+    self.Place(Guy)
     while True:
       clock.tick(60)
       for e in pygame.event.get():
@@ -301,6 +323,26 @@ class Game(object):
       for o in self.objects:
         o.Render()
       pygame.display.flip()
+
+  def Place(self, cls):
+    p = ReadPixels(self.background, 0, 0, WIDTH * 2, HEIGHT * 2)
+    def Free(x, y):
+      return p[int(x) * 2 + int(y) * 4 * WIDTH] == '\0'
+    full = []
+    for x in range(0, WIDTH, 10):
+      for y in range(0, HEIGHT, 10):
+        if not Free(x, y):
+          full.append((x, y))
+    random.shuffle(full)
+    for x, y in full:
+      phi = math.atan2(y - HEIGHT / 2, x - WIDTH / 2)
+      r = Length(y - HEIGHT / 2, x - WIDTH / 2)
+      fx = (r + 10) * math.cos(phi) + WIDTH / 2
+      fy = (r + 10) * math.sin(phi) + HEIGHT / 2
+      if Free(fx, fy):
+        o = cls(float(x - WIDTH / 2), float(y - HEIGHT / 2), phi)
+        self.objects.append(o)
+        break
 
 if __name__ == '__main__':
   game = Game()
