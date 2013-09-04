@@ -65,12 +65,21 @@ def Quad(width, height):
 
 
 @contextlib.contextmanager
-def Buffer(b):
-  glBindFramebuffer(GL_FRAMEBUFFER, b)
+def Buffer(buf):
+  glBindFramebuffer(GL_FRAMEBUFFER, buf)
   glViewport(0, 0, WIDTH * 2, HEIGHT * 2)
   yield
   glBindFramebuffer(GL_FRAMEBUFFER, 0)
   glViewport(0, 0, WIDTH, HEIGHT)
+
+
+def Collision(buf, phi, r, radius):
+  x = r * math.cos(phi)
+  y = r * math.sin(phi)
+  glBindFramebuffer(GL_FRAMEBUFFER, buf)
+  p = glReadPixels(x * 2 + WIDTH - radius, y * 2 + HEIGHT - radius, radius, radius, GL_RED, GL_UNSIGNED_BYTE)
+  glBindFramebuffer(GL_FRAMEBUFFER, 0)
+  return any(c != '\0' for c in p)
 
 
 class Game(object):
@@ -108,7 +117,7 @@ class Game(object):
     light = Light(20, 100, 50)
     clock = pygame.time.Clock()
     while True:
-      clock.tick(40)
+      clock.tick(60)
       for e in pygame.event.get():
         if e.type == pygame.QUIT or e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
           pygame.quit()
@@ -127,6 +136,9 @@ class Game(object):
       self.vy *= 0.99
       self.x += self.vx
       self.y += self.vy
+      if Collision(background, self.x, self.y, 1):
+        print 'crash!', clock.get_fps()
+        sys.exit(0)
       glClear(GL_COLOR_BUFFER_BIT)
       glLoadIdentity()
       glEnable(GL_TEXTURE_2D)
@@ -137,7 +149,7 @@ class Game(object):
       glTranslatef(0, self.y, 0)
       Quad(30, 8)
       glTranslatef(0, 8, 0)
-      Quad(12, 8)
+      Quad(16, 8)
       pygame.display.flip()
 
 if __name__ == '__main__':
