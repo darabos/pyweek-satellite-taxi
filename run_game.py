@@ -9,6 +9,14 @@ from OpenGL.GL import *
 
 WIDTH, HEIGHT = 800, 600
 
+PRICES = {
+  'Crash': 100,
+  'Upgrade Engine': 100,
+  'Pay Back Debt': 100,
+  'Buy Shields': 75,
+  'Buy Bomb': 25,
+}
+
 def Light(radius, height, strength):
   r2 = float(radius * radius)
   h2 = float(height * height)
@@ -224,7 +232,8 @@ class Taxi(object):
     if self.bonus > 20.2:
       self.bonus -= 0.1
 
-    pixels = ReadPixels(game.background, self.x * 2 + WIDTH - 5, self.y * 2 + HEIGHT - 5, 10, 10)
+    box = 20
+    pixels = ReadPixels(game.background, self.x * 2 + WIDTH - box / 2, self.y * 2 + HEIGHT - box / 2, box, box)
     if any(c == '\xff' for c in pixels):
       self.shields -= 1
       self.vphi *= -1
@@ -237,7 +246,7 @@ class Taxi(object):
           game.Soon(lambda: game.Place(Guy))
         game.objects.remove(self)
         game.Soon(game.NewTaxi)
-        game.TakeMoney(100)
+        game.TakeMoney(PRICES['Crash'])
     for c in pixels:
       for k, v in SHOPS.items():
         if c == chr(k[0]):
@@ -252,22 +261,19 @@ class Taxi(object):
               game.money_v = 1
             break
           self.shop_timer += 1
-          if self.shop_timer == 180:
+          if self.shop_timer == 120:
+            game.TakeMoney(PRICES[v])
             if v == 'Pay Back Debt':
-              game.TakeMoney(100)
               game.debt_v += 1
-              game.debt -= 100
+              game.debt -= PRICES[v]
               if game.debt < 0:
                 game.money -= game.debt
                 game.debt = 0
             elif v == 'Upgrade Engine':
-              game.TakeMoney(100)
               self.engine += 1
             elif v == 'Buy Shields':
-              game.TakeMoney(100)
               self.shields += 1
             elif v == 'Buy Bomb':
-              game.TakeMoney(100)
               self.bombs += 1
           break
       else:
@@ -423,6 +429,7 @@ SHOPS = {
   (52, 179, 255): 'Buy Shields',
   (53, 179, 255): 'Buy Bomb',
 }
+
 
 class Building(Popup):
 
