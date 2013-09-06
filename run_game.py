@@ -185,7 +185,13 @@ class Taxi(object):
     for c in pixels:
       for k, v in SHOPS.items():
         if c == chr(k[0]):
+          if v == 'Pay Back Debt' and game.debt <= 0:
+            self.shop_timer = 0
+            if game.debt_pos < 1:
+              game.debt_v = 1
+            break
           if game.money < 100:
+            self.shop_timer = 0
             if game.money_pos < 1:
               game.money_v = 1
             break
@@ -195,6 +201,9 @@ class Taxi(object):
               game.TakeMoney(100)
               game.debt_v += 1
               game.debt -= 100
+              if game.debt < 0:
+                game.money -= game.debt
+                game.debt = 0
             elif v == 'Upgrade Engine':
               game.TakeMoney(100)
               self.engine += 1
