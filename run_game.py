@@ -230,6 +230,48 @@ class Taxi(object):
         glTranslate(8, 0, 0)
         Quad(8, 16)
 
+  def DropBomb(self):
+    if self.bombs == 0:
+      return
+    self.bombs -= 1
+    game.objects.append(Bomb(self.r, self.phi, self.vr, self.vphi))
+
+
+class Bomb(object):
+
+  def __init__(self, r, phi, vr, vphi):
+    self.r = r
+    self.phi = phi
+    self.vr = vr
+    self.vphi = vphi
+
+  def Update(self):
+    self.vr -= 0.02
+    self.vphi *= 0.99
+    self.vr *= 0.99
+    self.phi += self.vphi
+    self.r += self.vr
+    self.x = self.r * math.cos(self.phi * math.pi / 180)
+    self.y = self.r * math.sin(self.phi * math.pi / 180)
+
+    pixels = ReadPixels(game.background, self.x * 2 + WIDTH - 5, self.y * 2 + HEIGHT - 5, 10, 10)
+    if any(c != '\0' for c in pixels):
+      with Buffer(game.background):
+        glLoadIdentity()
+        with Transform():
+          glTranslate(self.x, self.y, 0)
+          with Color(0, 0, 0):
+            Circle(50)
+        Circle(50)
+      game.objects.remove(self)
+
+  def Render(self):
+    with Transform():
+      glRotate(self.phi, 0, 0, 1)
+      glTranslate(self.r, 0, 0)
+      with Color(1.0, 0.7, 0.2):
+        Circle(5)
+
 
 class Popup(object):
   dist = 10
@@ -458,8 +500,8 @@ class Game(object):
         f()
       for e in pygame.event.get():
         if e.type == pygame.KEYDOWN and e.key == pygame.K_SPACE:
-          # DEBUG
-          self.Place(Building)
+          if self.taxi in self.objects:
+            self.taxi.DropBomb()
         if e.type == pygame.QUIT or e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
           print 'fps:', clock.get_fps()
           pygame.quit()
