@@ -428,6 +428,8 @@ class Game(object):
     full = []
     for x in range(0, WIDTH, 10):
       for y in range(0, HEIGHT, 10):
+        if Length(game.taxi.x - x + WIDTH / 2, game.taxi.y - y + HEIGHT / 2) < 100:
+          continue
         if not Free(x, y):
           full.append((x, y))
     random.shuffle(full)
