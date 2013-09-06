@@ -165,10 +165,7 @@ class Taxi(object):
         game.Soon(lambda: game.Place(Guy))
       game.objects.remove(self)
       game.Soon(game.NewTaxi)
-      game.money -= 100
-      if game.money < 0:
-        game.debt -= game.money
-        game.money = 0
+      game.TakeMoney(100)
 
   def Render(self):
     with Transform():
@@ -257,7 +254,7 @@ class Destination(Popup):
           game.taxi.passenger = None
           game.Place(Building)
           game.Soon(lambda: game.Place(Guy))
-          game.money += 100
+          game.GiveMoney(100)
 
   def Render(self):
     with Transform():
@@ -344,6 +341,10 @@ class Game(object):
     self.objects = []
     self.money = 0
     self.debt = 1000
+    self.debt_pos = 30
+    self.debt_v = 0
+    self.money_pos = 30
+    self.money_v = 0
 
   def Loop(self):
     pygame.init()
@@ -398,11 +399,20 @@ class Game(object):
         Quad(WIDTH, HEIGHT)
       for o in self.objects:
         o.Render()
-      self.font.Render(-WIDTH / 2 + 20, HEIGHT / 2 - 20, 'DEBT:', (1.0, 1.0, 1.0))
-      self.bigfont.Render(-WIDTH / 2 + 130, HEIGHT / 2 - 20, str(self.debt), (1.0, 0.7, 0.2), align='right')
-      self.font.Render(WIDTH / 2 - 130, HEIGHT / 2 - 20, 'CASH:', (1.0, 1.0, 1.0))
-      self.bigfont.Render(WIDTH / 2 - 20, HEIGHT / 2 - 20, str(self.money), (0.5, 1.0, 0.2), align='right')
+      self.HUD()
       pygame.display.flip()
+
+  def HUD(self):
+    self.debt_v -= 0.05 * self.debt_pos
+    self.debt_v *= 0.85
+    self.debt_pos += self.debt_v
+    self.money_v -= 0.05 * self.money_pos
+    self.money_v *= 0.85
+    self.money_pos += self.money_v
+    self.font.Render(-WIDTH / 2 + 20, HEIGHT / 2 - 20 + self.debt_pos, 'DEBT:', (1.0, 1.0, 1.0))
+    self.bigfont.Render(-WIDTH / 2 + 130, HEIGHT / 2 - 20 + self.debt_pos, str(self.debt), (1.0, 0.7, 0.2), align='right')
+    self.font.Render(WIDTH / 2 - 130, HEIGHT / 2 - 20 + self.money_pos, 'CASH:', (1.0, 1.0, 1.0))
+    self.bigfont.Render(WIDTH / 2 - 20, HEIGHT / 2 - 20 + self.money_pos, str(self.money), (0.5, 1.0, 0.2), align='right')
 
   def Place(self, cls):
     p = ReadPixels(self.background, 0, 0, WIDTH * 2, HEIGHT * 2)
@@ -431,6 +441,21 @@ class Game(object):
   def NewTaxi(self):
     self.taxi = Taxi()
     self.objects.append(self.taxi)
+
+  def GiveMoney(self, m):
+    game.money += m
+    game.money_v += 1
+
+  def TakeMoney(self, m):
+    game.money -= m
+    if game.money >= 0:
+      game.money_v += 1
+    else:
+      game.debt -= game.money
+      game.debt_v += 1
+      if game.money != -m:
+        game.money_v += 1
+      game.money = 0
 
 
 if __name__ == '__main__':
