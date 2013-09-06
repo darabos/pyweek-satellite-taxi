@@ -53,6 +53,14 @@ def Circle(radius):
   glEnd()
 
 
+def Ring(radius):
+  glBegin(GL_LINES)
+  segments = radius * 5
+  for i in range(segments + 1):
+    glVertex2d(radius * math.cos(math.pi * 2 * i / segments), radius * math.sin(math.pi * 2 * i / segments))
+  glEnd()
+
+
 def Quad(width, height):
   glBegin(GL_TRIANGLE_STRIP)
   glTexCoord2d(0, 0)
@@ -116,11 +124,6 @@ def ReadPixels(buf, x, y, w, h):
   return p
 
 
-def Collision(buf, x, y, radius):
-  p = ReadPixels(buf, x * 2 + WIDTH - radius, y * 2 + HEIGHT - radius, radius, radius)
-  return any(c != '\0' for c in p)
-
-
 class Taxi(object):
   light = None
 
@@ -129,22 +132,26 @@ class Taxi(object):
     self.r = 200
     self.x = self.r * math.cos(self.phi * math.pi / 180)
     self.y = self.r * math.sin(self.phi * math.pi / 180)
+    self.engine = 1
+    self.shields = 0
+    self.bombs = 0
     self.vphi = self.vr = 0
     if Taxi.light == None:
       Taxi.light = Light(20, 100, 50)
     self.passenger = None
     self.bonus = 0
+    self.shop_timer = 0
 
   def Update(self):
     pressed = pygame.key.get_pressed()
     if pressed[pygame.K_LEFT]:
-      self.vphi += 10. / self.r
+      self.vphi += self.engine * 10. / self.r
     if pressed[pygame.K_RIGHT]:
-      self.vphi -= 10. / self.r
+      self.vphi -= self.engine * 10. / self.r
     if pressed[pygame.K_DOWN]:
-      self.vr -= 0.1
+      self.vr -= self.engine * 0.1
     if pressed[pygame.K_UP]:
-      self.vr += 0.1
+      self.vr += self.engine * 0.1
     self.vr -= 0.02
     self.vphi *= 0.99
     self.vr *= 0.99
@@ -152,23 +159,57 @@ class Taxi(object):
     self.r += self.vr
     self.x = self.r * math.cos(self.phi * math.pi / 180)
     self.y = self.r * math.sin(self.phi * math.pi / 180)
-    if Collision(game.background, self.x, self.y, 5):
-      with Buffer(game.background):
-        glLoadIdentity()
-        with Transform():
-          glTranslate(self.x, self.y, 0)
-          with Color(0, 0, 0):
-            Circle(50)
-        Circle(50)
-      if self.passenger:
-        self.passenger = None
-        game.objects = [o for o in game.objects if not isinstance(o, Destination)]
-        game.Soon(lambda: game.Place(Guy))
-      game.objects.remove(self)
-      game.Soon(game.NewTaxi)
-      game.TakeMoney(100)
     if self.bonus > 20.2:
       self.bonus -= 0.1
+
+    pixels = ReadPixels(game.background, self.x * 2 + WIDTH - 5, self.y * 2 + HEIGHT - 5, 10, 10)
+    if any(c == '\xff' for c in pixels):
+      self.shields -= 1
+      self.vphi *= -1
+      self.vr *= -1
+      if self.shields < 0:
+        with Buffer(game.background):
+          glLoadIdentity()
+          with Transform():
+            glTranslate(self.x, self.y, 0)
+            with Color(0, 0, 0):
+              Circle(50)
+          Circle(50)
+        if self.passenger:
+          self.passenger = None
+          game.objects = [o for o in game.objects if not isinstance(o, Destination)]
+          game.Soon(lambda: game.Place(Guy))
+        game.objects.remove(self)
+        game.Soon(game.NewTaxi)
+        game.TakeMoney(100)
+    for c in pixels:
+      for k, v in SHOPS.items():
+        if c == chr(k[0]):
+          if game.money < 100:
+            if game.money_pos < 1:
+              game.money_v = 1
+            break
+          self.shop_timer += 1
+          if self.shop_timer == 180:
+            if v == 'Pay Back Debt':
+              game.TakeMoney(100)
+              game.debt_v += 1
+              game.debt -= 100
+            elif v == 'Upgrade Engine':
+              game.TakeMoney(100)
+              self.engine += 1
+            elif v == 'Buy Shields':
+              game.TakeMoney(100)
+              self.shields += 1
+            elif v == 'Buy Bomb':
+              game.TakeMoney(100)
+              self.bombs += 1
+          break
+      else:
+        continue
+      break
+    else:
+      self.shop_timer = 0
 
   def Render(self):
     with Transform():
@@ -176,10 +217,15 @@ class Taxi(object):
       glTranslate(self.r, 0, 0)
       with Texture(self.light):
         with Blending(GL_ONE, GL_ONE):
-          with Color(0.2, 0.2, 0.2):
+          f = self.shop_timer / 180. if self.shop_timer < 180 else 0
+          f = 0.8 * f
+          with Color(0.2 + 0.2 * f, 0.2 + 0.7 * f, 0.2 + f):
             Quad(1024, 1024)
       color = (1, 1, 1) if not self.passenger else (0.5, 1, 0.2)
+      for i in range(self.shields):
+        Ring(20 + i * 5)
       with Color(*color):
+        glTranslate(-4, 0, 0)
         Quad(8, 30)
         glTranslate(8, 0, 0)
         Quad(8, 16)
@@ -215,7 +261,7 @@ class Guy(Popup):
 
   def Update(self):
     super(Guy, self).Update()
-    if not game.taxi.passenger:
+    if not game.taxi.passenger and game.taxi in game.objects:
       dx = game.taxi.x - self.x
       dy = game.taxi.y - self.y
       d2 = dx * dx + dy * dy
@@ -270,6 +316,12 @@ class Destination(Popup):
         glRotate(45, 0, 0, 1)
         Quad(10, 10)
 
+SHOPS = {
+  (50, 179, 255): 'Upgrade Engine',
+  (51, 179, 255): 'Pay Back Debt',
+  (52, 179, 255): 'Buy Shields',
+  (53, 179, 255): 'Buy Bomb',
+}
 
 class Building(Popup):
 
@@ -277,6 +329,11 @@ class Building(Popup):
     super(Building, self).__init__(x, y, phi)
     self.w = 20 + max(0, random.gauss(20, 20))
     self.h = 40 + max(0, random.gauss(40, 40))
+    self.color = 255, 255, 255
+    if random.random() < 0.2:
+      self.color = random.choice(SHOPS.keys())
+      self.w = max(self.w, 80)
+      self.h = max(self.h, 80)
 
   def Update(self):
     super(Building, self).Update()
@@ -288,9 +345,14 @@ class Building(Popup):
   def Render(self):
     with Transform():
       glTranslate(self.x, self.y, 0)
-      glRotate(self.phi + 90, 0, 0, 1)
+      glRotate(self.phi - 90, 0, 0, 1)
       glScale(self.scale, self.scale, 1)
-      Quad(self.w, self.h)
+      with Color([c / 255. for c in self.color]):
+        Quad(self.w, self.h)
+      if self.color in SHOPS:
+        text = SHOPS[self.color].split()
+        for i, w in enumerate(text):
+          game.smallfont.Render(0, (len(text) * 0.5 - 0.5 - i) * 20, w, (0, 0, 0), 'center')
 
 
 class Font(object):
@@ -299,7 +361,7 @@ class Font(object):
     self.font = pygame.font.Font('OpenSans-ExtraBold.ttf', size)
     self.cache = {}
 
-  def Render(self, x, y, text, color, align='left'):
+  def Render(self, x, y, text, color, align):
     if text not in self.cache:
       surface = self.font.render(text, True, (255, 255, 255), (0, 0, 0))
       data = pygame.image.tostring(surface, 'RGBA', 1)
@@ -321,6 +383,10 @@ class Font(object):
         glTranslate(x + width / 2, y, 0)
       elif align == 'right':
         glTranslate(x - width / 2, y, 0)
+      elif align == 'center':
+        glTranslate(x, y, 0)
+      else:
+        assert False, align
       with Texture(tex):
         with Blending(GL_ZERO, GL_ONE_MINUS_SRC_COLOR):
           Quad(width, height)
@@ -377,8 +443,10 @@ class Game(object):
       Circle(100)
     clock = pygame.time.Clock()
     self.NewTaxi()
+    self.taxi.shields = 1
     self.Place(Guy)
     pygame.font.init()
+    self.smallfont = Font(12)
     self.font = Font(16)
     self.bigfont = Font(20)
 
@@ -414,12 +482,12 @@ class Game(object):
     self.money_v -= 0.05 * self.money_pos
     self.money_v *= 0.85
     self.money_pos += self.money_v
-    self.font.Render(-WIDTH / 2 + 20, HEIGHT / 2 - 20 + self.debt_pos, 'DEBT:', (1.0, 1.0, 1.0))
-    self.bigfont.Render(-WIDTH / 2 + 130, HEIGHT / 2 - 20 + self.debt_pos, str(self.debt), (1.0, 0.7, 0.2), align='right')
-    self.font.Render(WIDTH / 2 - 130, HEIGHT / 2 - 20 + self.money_pos, 'CASH:', (1.0, 1.0, 1.0))
-    self.bigfont.Render(WIDTH / 2 - 20, HEIGHT / 2 - 20 + self.money_pos, str(self.money), (0.5, 1.0, 0.2), align='right')
+    self.font.Render(-WIDTH / 2 + 20, HEIGHT / 2 - 20 + self.debt_pos, 'DEBT:', (1.0, 1.0, 1.0), 'left')
+    self.bigfont.Render(-WIDTH / 2 + 130, HEIGHT / 2 - 20 + self.debt_pos, str(self.debt), (1.0, 0.7, 0.2), 'right')
+    self.font.Render(WIDTH / 2 - 130, HEIGHT / 2 - 20 + self.money_pos, 'CASH:', (1.0, 1.0, 1.0), 'left')
+    self.bigfont.Render(WIDTH / 2 - 20, HEIGHT / 2 - 20 + self.money_pos, str(self.money), (0.5, 1.0, 0.2), 'right')
     if self.taxi.bonus:
-      self.font.Render(WIDTH / 2 - 20, HEIGHT / 2 - 40, '+%d' % self.taxi.bonus, (0.5, 1.0, 0.2), align='right')
+      self.font.Render(WIDTH / 2 - 20, HEIGHT / 2 - 40, '+%d' % self.taxi.bonus, (0.5, 1.0, 0.2), 'right')
 
   def Place(self, cls):
     p = ReadPixels(self.background, 0, 0, WIDTH * 2, HEIGHT * 2)
