@@ -88,9 +88,9 @@ def Texture(tex):
 
 
 @contextlib.contextmanager
-def Blending():
+def Blending(src, dst):
   glEnable(GL_BLEND)
-  glBlendFunc(GL_ONE, GL_ONE)
+  glBlendFunc(src, dst)
   yield
   glDisable(GL_BLEND)
 
@@ -165,13 +165,17 @@ class Taxi(object):
         game.Soon(lambda: game.Place(Guy))
       game.objects.remove(self)
       game.Soon(game.NewTaxi)
+      game.money -= 100
+      if game.money < 0:
+        game.debt -= game.money
+        game.money = 0
 
   def Render(self):
     with Transform():
       glRotate(self.phi, 0, 0, 1)
       glTranslate(self.r, 0, 0)
       with Texture(self.light):
-        with Blending():
+        with Blending(GL_ONE, GL_ONE):
           with Color(0.2, 0.2, 0.2):
             Quad(1024, 1024)
       color = (1, 1, 1) if not self.passenger else (0.5, 1, 0.2)
@@ -253,6 +257,7 @@ class Destination(Popup):
           game.taxi.passenger = None
           game.Place(Building)
           game.Soon(lambda: game.Place(Guy))
+          game.money += 100
 
   def Render(self):
     with Transform():
@@ -286,6 +291,47 @@ class Building(Popup):
       Quad(self.w, self.h)
 
 
+class Font(object):
+
+  def __init__(self, size):
+    self.font = pygame.font.Font('OpenSans-ExtraBold.ttf', size)
+    self.cache = {}
+
+  def Render(self, x, y, text, color, align='left'):
+    if text not in self.cache:
+      surface = self.font.render(text, True, (255, 255, 255), (0, 0, 0))
+      data = pygame.image.tostring(surface, 'RGBA', 1)
+      tex = glGenTextures(1)
+      width = surface.get_width()
+      height = surface.get_height()
+      glBindTexture(GL_TEXTURE_2D, tex)
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+      glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP)
+      glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data)
+      if len(self.cache) > 20:
+        self.DropCache()
+      self.cache[text] = width, height, tex
+    width, height, tex = self.cache[text]
+    with Transform():
+      if align == 'left':
+        glTranslate(x + width / 2, y, 0)
+      elif align == 'right':
+        glTranslate(x - width / 2, y, 0)
+      with Texture(tex):
+        with Blending(GL_ZERO, GL_ONE_MINUS_SRC_COLOR):
+          Quad(width, height)
+        with Blending(GL_ONE, GL_ONE):
+          with Color(*color):
+            Quad(width, height)
+
+  def DropCache(self):
+    for w, h, tex in self.cache:
+      glDeleteTextures(tex)
+    self.cache = {}
+
+
 class Game(object):
 
   def __init__(self):
@@ -296,6 +342,8 @@ class Game(object):
     self.timers = []
     self.time = 0
     self.objects = []
+    self.money = 0
+    self.debt = 1000
 
   def Loop(self):
     pygame.init()
@@ -324,6 +372,10 @@ class Game(object):
     clock = pygame.time.Clock()
     self.NewTaxi()
     self.Place(Guy)
+    pygame.font.init()
+    self.font = Font(16)
+    self.bigfont = Font(20)
+
     while True:
       clock.tick(60)
       self.time += 1
@@ -346,6 +398,10 @@ class Game(object):
         Quad(WIDTH, HEIGHT)
       for o in self.objects:
         o.Render()
+      self.font.Render(-WIDTH / 2 + 20, HEIGHT / 2 - 20, 'DEBT:', (1.0, 1.0, 1.0))
+      self.bigfont.Render(-WIDTH / 2 + 130, HEIGHT / 2 - 20, str(self.debt), (1.0, 0.7, 0.2), align='right')
+      self.font.Render(WIDTH / 2 - 130, HEIGHT / 2 - 20, 'CASH:', (1.0, 1.0, 1.0))
+      self.bigfont.Render(WIDTH / 2 - 20, HEIGHT / 2 - 20, str(self.money), (0.5, 1.0, 0.2), align='right')
       pygame.display.flip()
 
   def Place(self, cls):
