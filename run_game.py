@@ -13,10 +13,12 @@ def Light(radius, height, strength):
   r2 = float(radius * radius)
   h2 = float(height * height)
   data = ''
-  if os.path.exists('light.data'):
-    with file('light.data') as f:
+  fn = 'light-%s-%s-%s.data' % (radius, height, strength)
+  if os.path.exists(fn):
+    with file(fn) as f:
       data = f.read()
   if len(data) != 3 * 1024 * 1024:
+    print 'Generating', fn, 'on first run...'
     data = (ctypes.c_char * (3 * 1024 * 1024))()
     i = 0
     for x in range(1024):
@@ -31,7 +33,7 @@ def Light(radius, height, strength):
         data[i * 3 + 1] = c
         data[i * 3 + 2] = c
         i += 1
-    with file('light.data', 'wb') as f:
+    with file(fn, 'wb') as f:
       f.write(data)
   tex = glGenTextures(1)
   glBindTexture(GL_TEXTURE_2D, tex)
@@ -124,6 +126,62 @@ def ReadPixels(buf, x, y, w, h):
   return p
 
 
+class Particle(object):
+  light = None
+
+  def __init__(self, r, phi, vr, vphi):
+    if Particle.light is None:
+      Particle.light = Light(20, 100, 5)
+    self.r = r
+    self.phi = phi
+    self.vr = vr
+    self.vphi = vphi
+    self.age = int(random.expovariate(1/50.))
+
+  def Update(self):
+    self.vr -= 0.02
+    self.vphi *= 0.99
+    self.vr *= 0.99
+    self.phi += self.vphi
+    self.r += self.vr
+    self.age += 1
+    if self.age >= 100:
+      game.objects.remove(self)
+
+  def Render(self):
+    with Transform():
+      glRotate(self.phi, 0, 0, 1)
+      glTranslate(self.r, 0, 0)
+      with Texture(self.light):
+        with Blending(GL_ONE, GL_ONE):
+          f = 100.0 / (100 + self.age)
+          with Color(f, f * f, f * f * f):
+            Quad(200 * f, 200 * f)
+
+
+def Explosion(r, phi, strength):
+  x = r * math.cos(phi * math.pi / 180)
+  y = r * math.sin(phi * math.pi / 180)
+  with Buffer(game.background):
+    glLoadIdentity()
+    with Transform():
+      glTranslate(x, y, 0)
+      with Color(0, 0, 0):
+        Circle(strength)
+    Circle(50)  # Moon core.
+  for i in range(strength * 2):
+    t = random.random() * math.pi * 2
+    s = random.random() + 1
+    dx = s * math.cos(t)
+    dy = s * math.sin(t)
+    vr = Length(x + dx, y + dy) - Length(x, y)
+    vphi = math.atan2(y + dy, x + dx) * 180 / math.pi - phi
+    vphi %= 360
+    if vphi > 180:
+      vphi -= 360
+    game.objects.append(Particle(r, phi, vr, vphi))
+
+
 class Taxi(object):
   light = None
 
@@ -145,12 +203,16 @@ class Taxi(object):
   def Update(self):
     pressed = pygame.key.get_pressed()
     if pressed[pygame.K_LEFT]:
+      game.objects.append(Particle(self.r, self.phi, self.vr, self.vphi - 100. / self.r))
       self.vphi += self.engine * 10. / self.r
     if pressed[pygame.K_RIGHT]:
+      game.objects.append(Particle(self.r, self.phi, self.vr, self.vphi + 100. / self.r))
       self.vphi -= self.engine * 10. / self.r
     if pressed[pygame.K_DOWN]:
+      game.objects.append(Particle(self.r, self.phi, self.vr + 1, self.vphi))
       self.vr -= self.engine * 0.1
     if pressed[pygame.K_UP]:
+      game.objects.append(Particle(self.r, self.phi, self.vr - 1, self.vphi))
       self.vr += self.engine * 0.1
     self.vr -= 0.02
     self.vphi *= 0.99
@@ -168,13 +230,7 @@ class Taxi(object):
       self.vphi *= -1
       self.vr *= -1
       if self.shields < 0:
-        with Buffer(game.background):
-          glLoadIdentity()
-          with Transform():
-            glTranslate(self.x, self.y, 0)
-            with Color(0, 0, 0):
-              Circle(50)
-          Circle(50)
+        Explosion(self.r, self.phi, 50)
         if self.passenger:
           self.passenger = None
           game.objects = [o for o in game.objects if not isinstance(o, Destination)]
@@ -265,13 +321,7 @@ class Bomb(object):
 
     pixels = ReadPixels(game.background, self.x * 2 + WIDTH - 5, self.y * 2 + HEIGHT - 5, 10, 10)
     if any(c != '\0' for c in pixels):
-      with Buffer(game.background):
-        glLoadIdentity()
-        with Transform():
-          glTranslate(self.x, self.y, 0)
-          with Color(0, 0, 0):
-            Circle(50)
-        Circle(50)
+      Explosion(self.r, self.phi, 40)
       game.objects.remove(self)
 
   def Render(self):
