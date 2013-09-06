@@ -177,7 +177,7 @@ def Explosion(r, phi, strength):
       with Color(0, 0, 0):
         Circle(strength)
     Circle(50)  # Moon core.
-  for i in range(strength * 2):
+  for i in range(strength):
     t = random.random() * math.pi * 2
     s = random.random() + 1
     dx = s * math.cos(t)
@@ -300,6 +300,12 @@ class Taxi(object):
         Quad(8, 30)
         glTranslate(8, 0, 0)
         Quad(8, 16)
+      if self.bombs:
+        glTranslate(-8, -10, 0)
+        with Color(1, 0.5, 0.2):
+          for i in range(self.bombs):
+            glTranslate(0, 5, 0)
+            Circle(2)
 
   def DropBomb(self):
     if self.bombs == 0:
