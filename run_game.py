@@ -133,6 +133,7 @@ class Taxi(object):
     if Taxi.light == None:
       Taxi.light = Light(20, 100, 50)
     self.passenger = None
+    self.bonus = 0
 
   def Update(self):
     pressed = pygame.key.get_pressed()
@@ -166,6 +167,8 @@ class Taxi(object):
       game.objects.remove(self)
       game.Soon(game.NewTaxi)
       game.TakeMoney(100)
+    if self.bonus > 20.2:
+      self.bonus -= 0.1
 
   def Render(self):
     with Transform():
@@ -224,6 +227,7 @@ class Guy(Popup):
           game.objects.remove(self)
           game.taxi.passenger = self
           game.Place(Destination)
+          game.taxi.bonus = 100
 
   def Render(self):
     with Transform():
@@ -254,7 +258,8 @@ class Destination(Popup):
           game.taxi.passenger = None
           game.Place(Building)
           game.Soon(lambda: game.Place(Guy))
-          game.GiveMoney(100)
+          game.GiveMoney(int(game.taxi.bonus))
+          game.taxi.bonus = 0
 
   def Render(self):
     with Transform():
@@ -307,7 +312,7 @@ class Font(object):
       glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP)
       glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data)
-      if len(self.cache) > 20:
+      if len(self.cache) > 200:
         self.DropCache()
       self.cache[text] = width, height, tex
     width, height, tex = self.cache[text]
@@ -324,7 +329,7 @@ class Font(object):
             Quad(width, height)
 
   def DropCache(self):
-    for w, h, tex in self.cache:
+    for w, h, tex in self.cache.values():
       glDeleteTextures(tex)
     self.cache = {}
 
@@ -413,6 +418,8 @@ class Game(object):
     self.bigfont.Render(-WIDTH / 2 + 130, HEIGHT / 2 - 20 + self.debt_pos, str(self.debt), (1.0, 0.7, 0.2), align='right')
     self.font.Render(WIDTH / 2 - 130, HEIGHT / 2 - 20 + self.money_pos, 'CASH:', (1.0, 1.0, 1.0))
     self.bigfont.Render(WIDTH / 2 - 20, HEIGHT / 2 - 20 + self.money_pos, str(self.money), (0.5, 1.0, 0.2), align='right')
+    if self.taxi.bonus:
+      self.font.Render(WIDTH / 2 - 20, HEIGHT / 2 - 40, '+%d' % self.taxi.bonus, (0.5, 1.0, 0.2), align='right')
 
   def Place(self, cls):
     p = ReadPixels(self.background, 0, 0, WIDTH * 2, HEIGHT * 2)
