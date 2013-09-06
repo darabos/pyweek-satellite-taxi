@@ -190,6 +190,20 @@ def Explosion(r, phi, strength):
     game.objects.append(Particle(r, phi, vr, vphi))
 
 
+def MostFrequent(l):
+  l = sorted(l)
+  mc = c = 0
+  mf = lx = None
+  for x in l:
+    if x == lx:
+      c += 1
+    if c > mc:
+      mc = c
+      mf = lx
+    lx = x
+  return mf
+
+
 class Taxi(object):
   light = None
 
@@ -247,38 +261,35 @@ class Taxi(object):
         game.objects.remove(self)
         game.Soon(game.NewTaxi)
         game.TakeMoney(PRICES['Crash'])
-    for c in pixels:
-      for k, v in SHOPS.items():
-        if c == chr(k[0]):
-          if v == 'Pay Back Debt' and game.debt <= 0:
-            self.shop_timer = 0
-            if game.debt_pos < 1:
-              game.debt_v = 1
-            break
-          if game.money < 100:
-            self.shop_timer = 0
-            if game.money_pos < 1:
-              game.money_v = 1
-            break
-          self.shop_timer += 1
-          if self.shop_timer == 120:
-            game.TakeMoney(PRICES[v])
-            if v == 'Pay Back Debt':
-              game.debt_v += 1
-              game.debt -= PRICES[v]
-              if game.debt < 0:
-                game.money -= game.debt
-                game.debt = 0
-            elif v == 'Upgrade Engine':
-              self.engine += 1
-            elif v == 'Buy Shields':
-              self.shields += 1
-            elif v == 'Buy Bomb':
-              self.bombs += 1
+    mf = MostFrequent([ord(p) for p in pixels if p != '\0'])
+    for k, v in SHOPS.items():
+      if mf == k[0]:
+        if v == 'Pay Back Debt' and game.debt <= 0:
+          self.shop_timer = 0
+          if game.debt_pos < 1:
+            game.debt_v = 1
           break
-      else:
-        continue
-      break
+        if game.money < 100:
+          self.shop_timer = 0
+          if game.money_pos < 1:
+            game.money_v = 1
+          break
+        self.shop_timer += 1
+        if self.shop_timer == 120:
+          game.TakeMoney(PRICES[v])
+          if v == 'Pay Back Debt':
+            game.debt_v += 1
+            game.debt -= PRICES[v]
+            if game.debt < 0:
+              game.money -= game.debt
+              game.debt = 0
+          elif v == 'Upgrade Engine':
+            self.engine += 1
+          elif v == 'Buy Shields':
+            self.shields += 1
+          elif v == 'Buy Bomb':
+            self.bombs += 1
+        break
     else:
       self.shop_timer = 0
 
