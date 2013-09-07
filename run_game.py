@@ -385,7 +385,7 @@ class Popup(object):
     self.x += self.vx
     self.y += self.vy
     d2 = dx * dx + dy * dy
-    self.scale = 1.0 / (1.0 + 0.1 * d2)
+    self.scale = 1.0 / (1.0 + 0.01 * d2)
 
 
 class Guy(Popup):
