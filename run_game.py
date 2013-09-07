@@ -29,7 +29,7 @@ SOUNDS = {
   'win': 'win.ogg',
 }
 
-MUSIC = ['space-waltz.ogg']
+MUSIC = ['space-rave.ogg', 'space-waltz.ogg']
 
 
 def Light(radius, height, strength):
