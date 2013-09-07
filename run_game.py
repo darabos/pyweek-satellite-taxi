@@ -26,7 +26,10 @@ SOUNDS = {
   'buy': 'buy.ogg',
   'shield-down': 'shield-down.ogg',
   'engine': 'engine.ogg',
+  'win': 'win.ogg',
 }
+
+MUSIC = ['space-waltz.ogg']
 
 
 def Light(radius, height, strength):
@@ -619,6 +622,12 @@ class Game(object):
     while True:
       clock.tick(60)
       self.time += 1
+      if not pygame.mixer.music.get_busy():
+        m = MUSIC.pop()
+        pygame.mixer.music.load(m)
+        pygame.mixer.music.set_volume(0.5)
+        pygame.mixer.music.play()
+        MUSIC.insert(0, m)
       while self.timers and self.timers[0][0] == self.time:
         t, f = self.timers.pop(0)
         f()
