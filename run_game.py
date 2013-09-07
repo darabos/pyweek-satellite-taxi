@@ -283,9 +283,13 @@ class Taxi(object):
           if v == 'Pay Debt':
             game.debt_v += 1
             game.debt -= PRICES[v]
-            if game.debt < 0:
+            if game.debt <= 0:
               game.money -= game.debt
               game.debt = 0
+              d = 1 if self.y < 0 else -1
+              Explosion(200, d * 90, 40)
+              with Buffer(game.background):
+                game.bigfont.Render(0, d * 200, 'Congratulations!', (1, 1, 1), 'center')
           elif v == 'Upgrade Engine':
             self.engine += 1
           elif v == 'Buy Shields':
@@ -315,8 +319,8 @@ class Taxi(object):
         glTranslate(8, 0, 0)
         Quad(8, 16)
       if self.bombs:
-        glTranslate(-8, -10, 0)
-        with Color(1, 0.5, 0.2):
+        glTranslate(-8, -16, 0)
+        with Color(0, 0, 0):
           for i in range(self.bombs):
             glTranslate(0, 5, 0)
             Circle(2)
