@@ -272,7 +272,7 @@ class Taxi(object):
           if game.debt_pos < 1:
             game.debt_v = 1
           break
-        if game.money < 100:
+        if game.money < PRICES[v]:
           self.shop_timer = 0
           if game.money_pos < 1:
             game.money_v = 1
