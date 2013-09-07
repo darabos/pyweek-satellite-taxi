@@ -17,6 +17,9 @@ PRICES = {
   'Buy Bomb': 25,
 }
 
+SHOPPING_TIME = 120
+
+
 def Light(radius, height, strength):
   r2 = float(radius * radius)
   h2 = float(height * height)
@@ -275,7 +278,7 @@ class Taxi(object):
             game.money_v = 1
           break
         self.shop_timer += 1
-        if self.shop_timer == 120:
+        if self.shop_timer == SHOPPING_TIME:
           game.TakeMoney(PRICES[v])
           if v == 'Pay Back Debt':
             game.debt_v += 1
@@ -299,7 +302,7 @@ class Taxi(object):
       glTranslate(self.r, 0, 0)
       with Texture(self.light):
         with Blending(GL_ONE, GL_ONE):
-          f = self.shop_timer / 180. if self.shop_timer < 180 else 0
+          f = float(self.shop_timer) / SHOPPING_TIME if self.shop_timer < SHOPPING_TIME else 0
           f = 0.8 * f
           with Color(0.2 + 0.2 * f, 0.2 + 0.7 * f, 0.2 + f):
             Quad(1024, 1024)
@@ -447,16 +450,23 @@ SHOPS = {
   (53, 179, 255): 'Buy Bomb',
 }
 
+SHOP_ORDER = SHOPS.keys()
+random.shuffle(SHOP_ORDER)
+
 
 class Building(Popup):
+  last_shop = 0
 
   def __init__(self, x, y, phi):
     super(Building, self).__init__(x, y, phi)
     self.w = 20 + max(0, random.gauss(20, 20))
     self.h = 40 + max(0, random.gauss(40, 40))
     self.color = 255, 255, 255
-    if random.random() < 0.2:
-      self.color = random.choice(SHOPS.keys())
+    Building.last_shop += 1
+    if Building.last_shop > 1 and random.random() < 0.2 or Building.last_shop > 3:
+      Building.last_shop = 0
+      self.color = SHOP_ORDER.pop(0)
+      SHOP_ORDER.append(self.color)
       self.w = max(self.w, 80)
       self.h = max(self.h, 80)
 
@@ -477,7 +487,7 @@ class Building(Popup):
       if self.color in SHOPS:
         text = SHOPS[self.color].split()
         for i, w in enumerate(text):
-          game.smallfont.Render(0, (len(text) * 0.5 - 0.5 - i) * 20, w, (0, 0, 0), 'center')
+          game.smallfont.Render(0, (len(text) * 0.5 - 0.5 - i) * 20, w, (0.1, 0.1, 0.1), 'center')
 
 
 class Font(object):
