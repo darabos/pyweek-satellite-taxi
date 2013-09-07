@@ -19,6 +19,15 @@ PRICES = {
 
 SHOPPING_TIME = 120
 
+SOUNDS = {
+  'crash': 'crash.ogg',
+  'pickup': 'pickup.ogg',
+  'thanks': 'thanks.ogg',
+  'buy': 'buy.ogg',
+  'shield-down': 'shield-down.ogg',
+  'engine': 'engine.ogg',
+}
+
 
 def Light(radius, height, strength):
   r2 = float(radius * radius)
@@ -227,6 +236,10 @@ class Taxi(object):
 
   def Update(self):
     pressed = pygame.key.get_pressed()
+    if pressed[pygame.K_LEFT] or pressed[pygame.K_RIGHT] or pressed[pygame.K_UP] or pressed[pygame.K_DOWN]:
+      SOUNDS['engine'].play()
+    else:
+      SOUNDS['engine'].stop()
     if pressed[pygame.K_LEFT]:
       game.objects.append(Particle(self.r, self.phi, self.vr, self.vphi - 100. / self.r))
       self.vphi += self.engine * 10. / self.r
@@ -264,6 +277,10 @@ class Taxi(object):
         game.objects.remove(self)
         game.Soon(game.NewTaxi)
         game.TakeMoney(PRICES['Crash'])
+        SOUNDS['crash'].play()
+        SOUNDS['engine'].stop()
+      else:
+        SOUNDS['shield-down'].play()
     mf = MostFrequent([ord(p) for p in pixels if p != '\0'])
     for k, v in SHOPS.items():
       if mf == k[0]:
@@ -280,6 +297,7 @@ class Taxi(object):
         self.shop_timer += 1
         if self.shop_timer == SHOPPING_TIME:
           game.TakeMoney(PRICES[v])
+          SOUNDS['buy'].play()
           if v == 'Pay Debt':
             game.debt_v += 1
             game.debt -= PRICES[v]
@@ -290,6 +308,7 @@ class Taxi(object):
               Explosion(200, d * 90, 40)
               with Buffer(game.background):
                 game.bigfont.Render(0, d * 200, 'Congratulations!', (1, 1, 1), 'center')
+              SOUNDS['win'].play()
           elif v == 'Upgrade Engine':
             self.engine += 1
           elif v == 'Buy Shields':
@@ -353,6 +372,7 @@ class Bomb(object):
     if any(c != '\0' for c in pixels):
       Explosion(self.r, self.phi, 40)
       game.objects.remove(self)
+      SOUNDS['crash'].play()
 
   def Render(self):
     with Transform():
@@ -405,6 +425,7 @@ class Guy(Popup):
           game.taxi.passenger = self
           game.Place(Destination)
           game.taxi.bonus = 100
+          SOUNDS['pickup'].play()
 
   def Render(self):
     with Transform():
@@ -437,6 +458,7 @@ class Destination(Popup):
           game.Soon(lambda: game.Place(Guy))
           game.GiveMoney(int(game.taxi.bonus))
           game.taxi.bonus = 0
+          SOUNDS['thanks'].play()
 
   def Render(self):
     with Transform():
@@ -590,6 +612,9 @@ class Game(object):
     self.smallfont = Font(12)
     self.font = Font(16)
     self.bigfont = Font(20)
+    for k, v in SOUNDS.items():
+      SOUNDS[k] = pygame.mixer.Sound(v)
+    SOUNDS['engine'].set_volume(0.2)
 
     while True:
       clock.tick(60)
