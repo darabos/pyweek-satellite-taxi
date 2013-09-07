@@ -36,7 +36,8 @@ destination in one piece to make money. The faster the delivery, the higher
 the pay.
 
 With each delivery the city on the Moon grows. This makes navigation harder,
-but soon shops will also open and start selling useful items.
+but soon shops will also open and start selling useful items. Just fly over
+the blue surface and wait a few seconds to make the deal.
 
   - Buy Shields:     Each shield will save you from one otherwise lethal
                      collision.
