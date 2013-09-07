@@ -12,7 +12,7 @@ WIDTH, HEIGHT = 800, 600
 PRICES = {
   'Crash': 100,
   'Upgrade Engine': 100,
-  'Pay Back Debt': 100,
+  'Pay Debt': 100,
   'Buy Shields': 75,
   'Buy Bomb': 25,
 }
@@ -267,7 +267,7 @@ class Taxi(object):
     mf = MostFrequent([ord(p) for p in pixels if p != '\0'])
     for k, v in SHOPS.items():
       if mf == k[0]:
-        if v == 'Pay Back Debt' and game.debt <= 0:
+        if v == 'Pay Debt' and game.debt <= 0:
           self.shop_timer = 0
           if game.debt_pos < 1:
             game.debt_v = 1
@@ -280,7 +280,7 @@ class Taxi(object):
         self.shop_timer += 1
         if self.shop_timer == SHOPPING_TIME:
           game.TakeMoney(PRICES[v])
-          if v == 'Pay Back Debt':
+          if v == 'Pay Debt':
             game.debt_v += 1
             game.debt -= PRICES[v]
             if game.debt < 0:
@@ -445,7 +445,7 @@ class Destination(Popup):
 
 SHOPS = {
   (50, 179, 255): 'Upgrade Engine',
-  (51, 179, 255): 'Pay Back Debt',
+  (51, 179, 255): 'Pay Debt',
   (52, 179, 255): 'Buy Shields',
   (53, 179, 255): 'Buy Bomb',
 }
@@ -485,9 +485,11 @@ class Building(Popup):
       with Color([c / 255. for c in self.color]):
         Quad(self.w, self.h)
       if self.color in SHOPS:
-        text = SHOPS[self.color].split()
-        for i, w in enumerate(text):
-          game.smallfont.Render(0, (len(text) * 0.5 - 0.5 - i) * 20, w, (0.1, 0.1, 0.1), 'center')
+        text = SHOPS[self.color]
+        text += ' $%d' % PRICES[text]
+        words = text.split()
+        for i, w in enumerate(words):
+          game.smallfont.Render(0, (len(words) * 0.5 - 0.5 - i) * 20, w, (0.1, 0.1, 0.1), 'center')
 
 
 class Font(object):
