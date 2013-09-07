@@ -569,10 +569,6 @@ class Font(object):
 class Game(object):
 
   def __init__(self):
-    self.x = 0
-    self.y = 200
-    self.vx = 0
-    self.vy = 0
     self.timers = []
     self.time = 0
     self.objects = []
@@ -582,6 +578,7 @@ class Game(object):
     self.debt_v = 0
     self.money_pos = 30
     self.money_v = 0
+    self.show_hud = False
 
   def Loop(self):
     pygame.init()
@@ -609,8 +606,8 @@ class Game(object):
       Circle(100)
     clock = pygame.time.Clock()
     self.NewTaxi()
+    self.taxi.r = 330
     self.taxi.shields = 1
-    self.Place(Guy)
     pygame.font.init()
     self.smallfont = Font(12)
     self.font = Font(16)
@@ -618,6 +615,7 @@ class Game(object):
     for k, v in SOUNDS.items():
       SOUNDS[k] = pygame.mixer.Sound(v)
     SOUNDS['engine'].set_volume(0.2)
+    self.Soon(self.Intro, delay=120)
 
     while True:
       clock.tick(60)
@@ -651,6 +649,8 @@ class Game(object):
       pygame.display.flip()
 
   def HUD(self):
+    if not self.show_hud:
+      return
     self.debt_v -= 0.05 * self.debt_pos
     self.debt_v *= 0.85
     self.debt_pos += self.debt_v
@@ -663,6 +663,10 @@ class Game(object):
     self.bigfont.Render(WIDTH / 2 - 20, HEIGHT / 2 - 20 + self.money_pos, str(self.money), (0.5, 1.0, 0.2), 'right')
     if self.taxi.bonus:
       self.font.Render(WIDTH / 2 - 20, HEIGHT / 2 - 40, '+%d' % self.taxi.bonus, (0.5, 1.0, 0.2), 'right')
+
+  def Intro(self):
+    self.show_hud = True
+    self.Soon(lambda: self.Place(Guy))
 
   def Place(self, cls):
     p = ReadPixels(self.background, 0, 0, WIDTH * 2, HEIGHT * 2)
@@ -686,8 +690,8 @@ class Game(object):
         self.objects.append(o)
         break
 
-  def Soon(self, f):
-    self.timers.append((self.time + 50, f))
+  def Soon(self, f, delay=50):
+    self.timers.append((self.time + delay, f))
     self.timers.sort()
 
   def NewTaxi(self):
