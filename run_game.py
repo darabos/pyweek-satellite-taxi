@@ -29,7 +29,7 @@ SOUNDS = {
   'win': 'win.ogg',
 }
 
-MUSIC = ['space-rave.ogg', 'space-waltz.ogg']
+MUSIC = ['space-rock.ogg', 'space-rave.ogg', 'space-waltz.ogg']
 
 
 def Light(radius, height, strength):
@@ -608,6 +608,7 @@ class Game(object):
     self.NewTaxi()
     self.taxi.r = 330
     self.taxi.shields = 1
+    self.Soon(self.Intro, delay=120)
     pygame.font.init()
     self.smallfont = Font(12)
     self.font = Font(16)
@@ -615,7 +616,6 @@ class Game(object):
     for k, v in SOUNDS.items():
       SOUNDS[k] = pygame.mixer.Sound(v)
     SOUNDS['engine'].set_volume(0.2)
-    self.Soon(self.Intro, delay=120)
 
     while True:
       clock.tick(60)
